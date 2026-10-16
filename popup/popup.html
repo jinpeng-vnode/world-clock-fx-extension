@@ -13,50 +13,58 @@
   </header>
 
   <section class="toolbar">
-    <label class="sw"><input type="checkbox" id="pageFxToggle" checked /> 页面金额旁注</label>
+    <span class="toolbar-spacer"></span>
     <button type="button" id="fxRefresh" class="btn">⟳ 刷新汇率</button>
   </section>
   <p id="fxNote" class="fx-note">正在获取汇率…</p>
 
-  <section class="settings" aria-label="地区与汇率设置">
-    <label class="field">
-      <span class="field-lab">显示地区</span>
-      <select id="regionSelect" class="sel">
-        <option value="auto">跟随网页语言</option>
-        <option value="us">纽约 · en · USD</option>
-        <option value="eu">法兰克福 · 欧语 · EUR</option>
-        <option value="tr">伊斯坦布尔 · tr · TRY</option>
-        <option value="vn">胡志明市 · vi · VND</option>
-        <option value="br">圣保罗 · pt · BRL</option>
-      </select>
-    </label>
-    <p id="regionHint" class="hint">根据当前网页语言自动选择</p>
-    <label class="field row">
-      <span class="field-lab">1 USD =</span>
-      <input type="number" id="usdCnyInput" class="num" min="0.01" step="0.01" value="7" />
-      <span class="field-lab">CNY</span>
-    </label>
-  </section>
-
-  <div id="clkSingle" class="clk-wrap"></div>
-  <p id="noRegion" class="empty" hidden>当前网页语言无对应地区时钟，请在上方手动选择。</p>
-
-  <section class="convert" id="convertPanel" aria-label="金额换算">
-    <div class="conv-title">金额换算</div>
-    <div class="fx-in">
-      <input type="text" id="amtInput" inputmode="decimal" value="100" autocomplete="off" aria-label="当前币种金额" />
-      <span class="code" id="amtCur">USD</span>
+  <!-- 单张主卡：设置 + 时钟 + 换算；背景随日夜相位变色 -->
+  <div id="mainCard" class="main-card cty clk" hidden>
+    <div class="card-controls">
+      <label class="field">
+        <span class="field-lab">显示地区</span>
+        <select id="regionSelect" class="sel">
+          <option value="auto">跟随网页语言</option>
+          <option value="us">纽约 · en · USD</option>
+          <option value="eu">法兰克福 · 欧语 · EUR</option>
+          <option value="tr">伊斯坦布尔 · tr · TRY</option>
+          <option value="vn">胡志明市 · vi · VND</option>
+          <option value="br">圣保罗 · pt · BRL</option>
+        </select>
+      </label>
+      <p id="regionHint" class="hint">根据当前网页语言自动选择</p>
+      <label class="field row usd-row">
+        <span class="field-lab">1 USD =</span>
+        <input type="number" id="usdCnyInput" class="num" min="0.01" step="0.01" value="7" />
+        <span class="field-lab">CNY</span>
+      </label>
     </div>
-    <div class="conv-line">→ <strong id="usdOut">—</strong> <span class="unit">USD</span></div>
-    <div class="conv-line">→ <strong id="cnyOut">—</strong> <span class="unit">CNY</span></div>
-    <div class="rate-lines">
-      <div id="rateUsd">1 CUR ≈ — USD（实时）</div>
-      <div id="rateCny">1 USD = — CNY（可设置）</div>
+
+    <div id="clkMount" class="clk-mount"></div>
+
+    <div class="convert-compact" id="convertPanel" aria-label="金额换算">
+      <div class="conv-row">
+        <input type="text" id="amtInput" class="amt" inputmode="decimal" value="100" autocomplete="off" aria-label="当前币种金额" />
+        <span class="code" id="amtCur">USD</span>
+        <span class="arr">→</span>
+        <strong id="usdOut" class="out">—</strong>
+        <span class="unit">USD</span>
+        <span class="arr">→</span>
+        <strong id="cnyOut" class="out">—</strong>
+        <span class="unit">CNY</span>
+      </div>
+      <div class="rate-lines">
+        <span id="rateUsd">1 CUR ≈ — USD</span>
+        <span class="sep">·</span>
+        <span id="rateCny">1 USD = — CNY</span>
+      </div>
     </div>
-  </section>
+  </div>
+
+  <p id="noRegion" class="empty" hidden>当前网页语言无对应地区时钟，请手动选择地区。</p>
 
   <footer class="foot">
-    只显示当前网页对应的一个地区；换网页按语言自动切换（可按站点手动覆盖）。页面旁注：市价→USD，再按上方设定倍率→CNY。
+    只显示当前网页对应的一个地区；换网页按语言自动切换（可按站点手动覆盖）。页面本身不会被修改；金额换算仅在本弹窗内。
   </footer>
 
   <script src="../lib/countries.js"></script>

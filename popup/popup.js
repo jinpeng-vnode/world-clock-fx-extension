@@ -1,4 +1,3 @@
-
 (function () {
   const W = globalThis.WCFX;
   let fx = null;
@@ -6,9 +5,11 @@
   let usdCny = W.DEFAULT_USD_CNY;
   let tickTimer = null;
   let tabOrigin = "";
+  let tabUrl = "";
   let detectedLang = "";
-  let activeCountry = null; // resolved country object or null
-  let overrideMap = {}; // origin -> countryId | "auto"
+  let langSource = "";
+  let activeCountry = null;
+  let overrideMap = {};
 
   const $ = (id) => document.getElementById(id);
 
@@ -46,14 +47,14 @@
 
   function renderRegionHint(res) {
     const hint = $("regionHint");
-    if (!tabOrigin) {
-      hint.textContent = "当前标签页无法识别站点（如特殊页）";
+    if (!tabOrigin && !detectedLang) {
+      hint.textContent = "当前标签页语言待确认；可手动选择地区";
       return;
     }
     if (res.mode === "manual") {
-      hint.textContent = `本站手动：${res.country.city}（${res.country.cur}）；检测语言 ${detectedLang || "—"}`;
+      hint.textContent = `本站手动：${res.country.city}（${res.country.cur}）；检测 ${detectedLang || "—"}`;
     } else if (res.mode === "auto") {
-      hint.textContent = `跟随网页：语言 ${detectedLang || "—"} → ${res.country.city}（${res.country.cur}）`;
+      hint.textContent = `跟随网页：${detectedLang || "—"} → ${res.country.city}（${res.country.cur}）`;
     } else {
       hint.textContent = `语言 ${detectedLang || "—"} 无对应地区，请手动选择`;
     }
@@ -61,27 +62,34 @@
 
   function renderCard(res) {
     activeCountry = res.country;
-    const wrap = $("clkSingle");
+    const card = $("mainCard");
     const empty = $("noRegion");
-    const panel = $("convertPanel");
+    const mount = $("clkMount");
     if (!res.country) {
-      wrap.innerHTML = "";
+      card.hidden = true;
       empty.hidden = false;
-      panel.hidden = true;
+      mount.innerHTML = "";
+      card.classList.remove("ph-day", "ph-dawn", "ph-dusk", "ph-night");
+      delete card.dataset.z;
       return;
     }
     empty.hidden = true;
-    panel.hidden = false;
-    wrap.innerHTML = W.renderCardHtml(res.country);
+    card.hidden = false;
+    card.dataset.z = res.country.tz;
+    card.dataset.id = res.country.id;
+    card.dataset.cur = res.country.cur;
+    mount.innerHTML = W.renderCardHtml(res.country);
     $("amtCur").textContent = res.country.cur;
     tickAll();
     calcConvert();
   }
 
   function tickAll() {
+    const card = $("mainCard");
+    if (card.hidden || !card.dataset.z) return;
     const now = new Date();
     const bj = W.zoneOffsetMin(W.BJ_TZ, now);
-    document.querySelectorAll("#clkSingle .clk").forEach((el) => W.tickCard(el, now, bj));
+    W.tickCard(card, now, bj);
   }
 
   function calcConvert() {
@@ -92,19 +100,19 @@
     const rateUsd = $("rateUsd");
     const rateCny = $("rateCny");
 
-    rateCny.textContent = `1 USD = ${W.fmtNum(usdCny, 4)} CNY（可设置）`;
+    rateCny.textContent = `1 USD = ${W.fmtNum(usdCny, 4)} CNY`;
 
     if (!cur) {
       usdEl.textContent = "—";
       cnyEl.textContent = "—";
-      rateUsd.textContent = "1 CUR ≈ — USD（实时）";
+      rateUsd.textContent = "1 CUR ≈ — USD";
       return;
     }
 
     const per = W.usdPer(fx, cur);
     rateUsd.textContent = isFinite(per)
-      ? `1 ${cur} ≈ ${W.fmtNum(per)} USD（实时）`
-      : `1 ${cur} ≈ — USD（实时）`;
+      ? `1 ${cur} ≈ ${W.fmtNum(per)} USD`
+      : `1 ${cur} ≈ — USD`;
 
     if (!isFinite(amt)) {
       usdEl.textContent = "—";
@@ -121,8 +129,8 @@
     const note = $("fxNote");
     if (fx) {
       note.textContent =
-        `数据时间 ${W.fmtTime(fx.time)} · 获取于 ${W.fmtTime(fx.fetched)} · 来源 ${fx.src}` +
-        (offline ? " · ⚠ 离线，显示缓存" : "");
+        `数据 ${W.fmtTime(fx.time)} · 获取 ${W.fmtTime(fx.fetched)} · ${fx.src}` +
+        (offline ? " · ⚠ 离线缓存" : "");
       note.classList.toggle("warn", offline);
     } else {
       note.textContent = offline ? "⚠ 无法获取汇率，且没有缓存" : "正在获取汇率…";
@@ -151,48 +159,118 @@
     renderFxNote();
   }
 
+  function isStrongContentSource(source) {
+    if (!source) return false;
+    const s = String(source);
+    if (s.startsWith("heuristic")) return false;
+    if (s === "unknown" || s === "github-default") return false;
+    return true;
+  }
+
+  function langOk(code) {
+    if (!code) return false;
+    const n = W.normalizeLangCode(code);
+    return !!n.primary && n.primary !== "und";
+  }
+
+  /** 组合 chrome.tabs.detectLanguage + content；GitHub 兜底 en */
+  function pickBestLang(chromeLang, contentLang, contentSource, url) {
+    const chromeOk = langOk(chromeLang);
+    const contentOk = langOk(contentLang);
+    const strong = contentOk && isStrongContentSource(contentSource);
+
+    if (strong && chromeOk) {
+      const a = String(contentLang);
+      const b = String(chromeLang);
+      return a.length >= b.length ? { code: contentLang, source: contentSource } : { code: chromeLang, source: "tabs.detectLanguage" };
+    }
+    if (strong) return { code: contentLang, source: contentSource };
+    if (chromeOk) return { code: chromeLang, source: "tabs.detectLanguage" };
+    if (contentOk) return { code: contentLang, source: contentSource || "content" };
+
+    try {
+      const host = new URL(url).hostname || "";
+      if (host.includes("github.com")) {
+        return { code: "en", source: "github-default" };
+      }
+    } catch (e) {}
+    return { code: "", source: "" };
+  }
+
   async function loadTabLangAndOrigin() {
     const box = $("langBox");
+    detectedLang = "";
+    langSource = "";
+    tabOrigin = "";
+    tabUrl = "";
+
     try {
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
       if (!tab || tab.id == null) {
-        box.textContent = "语言 —";
-        tabOrigin = "";
-        detectedLang = "";
+        box.textContent = "语言 无活动标签";
+        box.title = "没有可查询的活动标签页";
         return;
       }
+
+      tabUrl = tab.url || "";
       try {
-        tabOrigin = tab.url ? new URL(tab.url).origin : "";
-        if (tabOrigin === "null" || tabOrigin.startsWith("chrome") || tabOrigin.startsWith("edge")) {
+        tabOrigin = tabUrl ? new URL(tabUrl).origin : "";
+        if (
+          !tabOrigin ||
+          tabOrigin === "null" ||
+          tabOrigin.startsWith("chrome:") ||
+          tabOrigin.startsWith("edge:") ||
+          tabOrigin.startsWith("about:") ||
+          tabOrigin.startsWith("devtools:")
+        ) {
           tabOrigin = "";
         }
       } catch (e) {
         tabOrigin = "";
       }
-      const info = await chrome.tabs.sendMessage(tab.id, { type: "wcfx-get-lang" });
-      if (info && info.code) {
-        detectedLang = info.code;
-        box.textContent = `语言 ${info.code}`;
-        box.title = `来源: ${info.source || ""}`;
+
+      let chromeLang = "";
+      try {
+        if (chrome.tabs.detectLanguage) {
+          chromeLang = await chrome.tabs.detectLanguage(tab.id);
+        }
+      } catch (e) {
+        chromeLang = "";
+      }
+
+      let contentLang = "";
+      let contentSource = "";
+      let contentErr = "";
+      try {
+        const info = await chrome.tabs.sendMessage(tab.id, { type: "wcfx-get-lang" });
+        if (info && info.code) {
+          contentLang = info.code;
+          contentSource = info.source || "content";
+        }
+      } catch (e) {
+        contentErr = "content script 未注入（如 chrome://、Web Store）";
+      }
+
+      const picked = pickBestLang(chromeLang, contentLang, contentSource, tabUrl);
+      detectedLang = picked.code || "";
+      langSource = picked.source || "";
+
+      if (detectedLang) {
+        box.textContent = `语言 ${detectedLang}`;
+        box.title = `来源: ${langSource}` +
+          (chromeLang ? ` · detectLanguage=${chromeLang}` : "") +
+          (contentLang ? ` · content=${contentLang}` : "");
       } else {
-        detectedLang = "";
-        box.textContent = "语言 —";
+        box.textContent = contentErr ? "语言 本页受限" : "语言 未能检测";
+        box.title = contentErr ||
+          `detectLanguage=${chromeLang || "—"}；content=${contentLang || "—"}；请手动选择地区`;
       }
     } catch (e) {
       detectedLang = "";
-      box.textContent = "语言 (本页不可用)";
-      box.title = "当前标签页未注入 content script（如 chrome://）";
+      langSource = "";
+      box.textContent = "语言 检测失败";
+      box.title = String(e && e.message ? e.message : e);
     }
-  }
-
-  async function initPageFxToggle() {
-    const o = await chrome.storage.local.get(W.LS_KEYS.pageFx);
-    const on = o[W.LS_KEYS.pageFx] !== false;
-    const el = $("pageFxToggle");
-    el.checked = on;
-    el.addEventListener("change", async () => {
-      await chrome.storage.local.set({ [W.LS_KEYS.pageFx]: el.checked });
-    });
   }
 
   function applyResolved() {
@@ -207,7 +285,6 @@
     usdCny = await W.loadUsdCny();
     $("usdCnyInput").value = String(usdCny);
 
-    await initPageFxToggle();
     await loadTabLangAndOrigin();
     applyResolved();
 
