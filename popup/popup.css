@@ -55,6 +55,16 @@ body {
 .field { display: flex; flex-direction: column; gap: 2px; margin-bottom: 4px; }
 .field.row, .usd-row { flex-direction: row; align-items: center; gap: 6px; margin-bottom: 0; }
 .field-lab { font-size: 11px; font-weight: 650; opacity: .85; }
+.filter {
+  width: 100%; padding: 4px 7px; margin-bottom: 4px; border-radius: 8px;
+  border: 1px solid rgba(0,0,0,.14); background: rgba(255,255,255,.78);
+  font-size: 12px; color: inherit;
+}
+.main-card.ph-night .filter {
+  background: rgba(255,255,255,.1);
+  border-color: rgba(255,255,255,.22);
+  color: #e6e9f5;
+}
 .sel {
   width: 100%; padding: 5px 7px; border-radius: 8px;
   border: 1px solid rgba(0,0,0,.14); background: rgba(255,255,255,.78);
@@ -152,3 +162,4 @@ body {
 .foot {
   padding: 0 12px 10px; font-size: 10px; color: #6b7385; line-height: 1.35;
 }
+

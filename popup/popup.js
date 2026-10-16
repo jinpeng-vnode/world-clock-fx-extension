@@ -10,6 +10,7 @@
   let langSource = "";
   let activeCountry = null;
   let overrideMap = {};
+  let allRegionOptions = [];
 
   const $ = (id) => document.getElementById(id);
 
@@ -26,55 +27,85 @@
     await chrome.storage.local.set({ [W.LS_KEYS.langOverrideByOrigin]: overrideMap });
   }
 
+  function fillRegionSelect(filterText) {
+    const sel = $("regionSelect");
+    const prev = sel.value || "auto";
+    const q = String(filterText || "").trim().toLowerCase();
+    sel.innerHTML = "";
+    const optAuto = document.createElement("option");
+    optAuto.value = "auto";
+    optAuto.textContent = "跟随网页语言";
+    sel.appendChild(optAuto);
+
+    const list = W.listRegionsForSelect();
+    allRegionOptions = list;
+    for (const r of list) {
+      const label = `${r.name} · ${r.city} · ${r.cur}`;
+      const hay = (label + " " + r.tz + " " + r.id).toLowerCase();
+      if (q && hay.indexOf(q) < 0) continue;
+      const opt = document.createElement("option");
+      opt.value = r.id;
+      opt.textContent = label;
+      sel.appendChild(opt);
+    }
+    // 恢复选中；若被过滤掉则仍保留 auto
+    if ([].some.call(sel.options, (o) => o.value === prev)) sel.value = prev;
+    else sel.value = "auto";
+  }
+
+  /** 永不返回空卡：未知语种 → UTC */
   function resolveCountry() {
     const ov = tabOrigin ? overrideMap[tabOrigin] : null;
     if (ov && ov !== "auto") {
-      const c = W.countryById(ov);
-      if (c) return { country: c, mode: "manual", mappedId: ov };
+      const c = W.regionById(ov) || W.countryById(ov);
+      if (c) return { country: c, mode: "manual", mappedId: c.id, guessed: false };
     }
-    const mapped = W.countryIdFromLang(detectedLang);
-    if (mapped) {
-      return { country: W.countryById(mapped), mode: "auto", mappedId: mapped };
-    }
-    return { country: null, mode: "none", mappedId: null };
+    const mappedId = W.regionIdFromLang(detectedLang);
+    const c = W.regionById(mappedId) || W.regionById("utc");
+    const guessed = mappedId === "utc" && !detectedLang;
+    const weak = mappedId === "utc" && !!detectedLang;
+    return {
+      country: c,
+      mode: "auto",
+      mappedId: c.id,
+      guessed: guessed || weak,
+      weakUtc: weak
+    };
   }
 
   function syncRegionSelect() {
     const sel = $("regionSelect");
     const ov = tabOrigin ? overrideMap[tabOrigin] : null;
-    sel.value = ov && ov !== "auto" ? ov : "auto";
+    const want = ov && ov !== "auto" ? ov : "auto";
+    if ([].some.call(sel.options, (o) => o.value === want)) sel.value = want;
+    else sel.value = "auto";
   }
 
   function renderRegionHint(res) {
     const hint = $("regionHint");
-    if (!tabOrigin && !detectedLang) {
-      hint.textContent = "当前标签页语言待确认；可手动选择地区";
-      return;
-    }
+    const langZh = W.langDisplayName(detectedLang);
     if (res.mode === "manual") {
-      hint.textContent = `本站手动：${res.country.city}（${res.country.cur}）；检测 ${detectedLang || "—"}`;
-    } else if (res.mode === "auto") {
-      hint.textContent = `跟随网页：${detectedLang || "—"} → ${res.country.city}（${res.country.cur}）`;
+      hint.textContent = `本站手动：${res.country.city}（${res.country.cur}）；检测 ${langZh}`;
+    } else if (res.weakUtc) {
+      hint.textContent = `语言 ${langZh} 暂无精确地区，已用 ${res.country.city}（${res.country.cur}），可手动选择`;
+    } else if (!detectedLang) {
+      hint.textContent = `未能检测语言，已显示 ${res.country.city}；可手动选择地区`;
     } else {
-      hint.textContent = `语言 ${detectedLang || "—"} 无对应地区，请手动选择`;
+      hint.textContent = `跟随网页：${langZh} → ${res.country.city}（${res.country.cur}）`;
     }
   }
 
   function renderCard(res) {
     activeCountry = res.country;
     const card = $("mainCard");
-    const empty = $("noRegion");
     const mount = $("clkMount");
-    if (!res.country) {
-      card.hidden = true;
-      empty.hidden = false;
-      mount.innerHTML = "";
-      card.classList.remove("ph-day", "ph-dawn", "ph-dusk", "ph-night");
-      delete card.dataset.z;
-      return;
-    }
-    empty.hidden = true;
+    // 主卡始终显示
     card.hidden = false;
+    if (!res.country) {
+      // 理论上不应发生；兜底 UTC
+      activeCountry = W.regionById("utc");
+      res = { country: activeCountry, mode: "auto", mappedId: "utc", weakUtc: true };
+    }
     card.dataset.z = res.country.tz;
     card.dataset.id = res.country.id;
     card.dataset.cur = res.country.cur;
@@ -173,7 +204,6 @@
     return !!n.primary && n.primary !== "und";
   }
 
-  /** 组合 chrome.tabs.detectLanguage + content；GitHub 兜底 en */
   function pickBestLang(chromeLang, contentLang, contentSource, url) {
     const chromeOk = langOk(chromeLang);
     const contentOk = langOk(contentLang);
@@ -182,7 +212,9 @@
     if (strong && chromeOk) {
       const a = String(contentLang);
       const b = String(chromeLang);
-      return a.length >= b.length ? { code: contentLang, source: contentSource } : { code: chromeLang, source: "tabs.detectLanguage" };
+      return a.length >= b.length
+        ? { code: contentLang, source: contentSource }
+        : { code: chromeLang, source: "tabs.detectLanguage" };
     }
     if (strong) return { code: contentLang, source: contentSource };
     if (chromeOk) return { code: chromeLang, source: "tabs.detectLanguage" };
@@ -255,14 +287,17 @@
       detectedLang = picked.code || "";
       langSource = picked.source || "";
 
+      const zhName = W.langDisplayName(detectedLang);
       if (detectedLang) {
-        box.textContent = `语言 ${detectedLang}`;
-        box.title = `来源: ${langSource}` +
+        box.textContent = `语言 ${zhName}`;
+        box.title =
+          `${zhName}（${detectedLang}）· 来源: ${langSource}` +
           (chromeLang ? ` · detectLanguage=${chromeLang}` : "") +
           (contentLang ? ` · content=${contentLang}` : "");
       } else {
         box.textContent = contentErr ? "语言 本页受限" : "语言 未能检测";
-        box.title = contentErr ||
+        box.title =
+          contentErr ||
           `detectLanguage=${chromeLang || "—"}；content=${contentLang || "—"}；请手动选择地区`;
       }
     } catch (e) {
@@ -284,6 +319,12 @@
     await loadOverrides();
     usdCny = await W.loadUsdCny();
     $("usdCnyInput").value = String(usdCny);
+
+    fillRegionSelect("");
+    $("regionFilter").addEventListener("input", () => {
+      fillRegionSelect($("regionFilter").value);
+      syncRegionSelect();
+    });
 
     await loadTabLangAndOrigin();
     applyResolved();

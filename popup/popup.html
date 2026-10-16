@@ -18,18 +18,13 @@
   </section>
   <p id="fxNote" class="fx-note">正在获取汇率…</p>
 
-  <!-- 单张主卡：设置 + 时钟 + 换算；背景随日夜相位变色 -->
-  <div id="mainCard" class="main-card cty clk" hidden>
+  <div id="mainCard" class="main-card cty clk">
     <div class="card-controls">
       <label class="field">
         <span class="field-lab">显示地区</span>
-        <select id="regionSelect" class="sel">
+        <input type="search" id="regionFilter" class="filter" placeholder="搜索地区 / 城市 / 货币…" autocomplete="off" />
+        <select id="regionSelect" class="sel" size="1">
           <option value="auto">跟随网页语言</option>
-          <option value="us">纽约 · en · USD</option>
-          <option value="eu">法兰克福 · 欧语 · EUR</option>
-          <option value="tr">伊斯坦布尔 · tr · TRY</option>
-          <option value="vn">胡志明市 · vi · VND</option>
-          <option value="br">圣保罗 · pt · BRL</option>
         </select>
       </label>
       <p id="regionHint" class="hint">根据当前网页语言自动选择</p>
@@ -45,7 +40,7 @@
     <div class="convert-compact" id="convertPanel" aria-label="金额换算">
       <div class="conv-row">
         <input type="text" id="amtInput" class="amt" inputmode="decimal" value="100" autocomplete="off" aria-label="当前币种金额" />
-        <span class="code" id="amtCur">USD</span>
+        <span class="code" id="amtCur">CNY</span>
         <span class="arr">→</span>
         <strong id="usdOut" class="out">—</strong>
         <span class="unit">USD</span>
@@ -61,10 +56,8 @@
     </div>
   </div>
 
-  <p id="noRegion" class="empty" hidden>当前网页语言无对应地区时钟，请手动选择地区。</p>
-
   <footer class="foot">
-    只显示当前网页对应的一个地区；换网页按语言自动切换（可按站点手动覆盖）。页面本身不会被修改；金额换算仅在本弹窗内。
+    按网页语言自动显示对应地区时钟与换算；可搜索并手动覆盖本站地区。页面本身不会被修改。
   </footer>
 
   <script src="../lib/countries.js"></script>
