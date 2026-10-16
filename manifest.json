@@ -1,0 +1,51 @@
+{
+  "manifest_version": 3,
+  "name": "世界时钟与汇率",
+  "version": "1.0.0",
+  "description": "自动识别网站语言、世界时钟、页面金额换算（标准汇率→USD→×7 人民币）",
+  "permissions": [
+    "storage",
+    "alarms",
+    "activeTab"
+  ],
+  "host_permissions": [
+    "https://open.er-api.com/*",
+    "https://cdn.jsdelivr.net/*",
+    "https://latest.currency-api.pages.dev/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_title": "世界时钟与汇率",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "http://*/*",
+        "https://*/*"
+      ],
+      "js": [
+        "lib/countries.js",
+        "lib/format.js",
+        "lib/fx.js",
+        "content/content.js"
+      ],
+      "css": [
+        "content/content.css"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}
