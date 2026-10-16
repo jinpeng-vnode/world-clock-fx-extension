@@ -14,13 +14,9 @@ chrome.runtime.onInstalled.addListener(async () => {
   await ensureAlarm();
   await WCFX.maybeAutoRefresh();
   const o = await chrome.storage.local.get([
-    WCFX.LS_KEYS.pageFx,
     WCFX.LS_KEYS.usdCny,
     WCFX.LS_KEYS.langOverrideByOrigin
   ]);
-  if (o[WCFX.LS_KEYS.pageFx] == null) {
-    await chrome.storage.local.set({ [WCFX.LS_KEYS.pageFx]: true });
-  }
   if (o[WCFX.LS_KEYS.usdCny] == null) {
     await chrome.storage.local.set({ [WCFX.LS_KEYS.usdCny]: WCFX.DEFAULT_USD_CNY });
   }
@@ -49,3 +45,4 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     return true;
   }
 });
+
