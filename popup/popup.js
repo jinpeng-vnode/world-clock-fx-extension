@@ -1,5 +1,6 @@
 (function () {
   const W = globalThis.WCFX;
+  const MIGRATE_OVERRIDE_KEY = "wcfx_override_cleared_v131";
   let fx = null;
   let offline = false;
   let usdCny = W.DEFAULT_USD_CNY;
@@ -11,19 +12,55 @@
   let activeCountry = null;
   let overrideMap = {};
   let allRegionOptions = [];
+  /** 禁止程序化改 select 时误写入覆盖 */
+  let suppressSelectSave = false;
 
   const $ = (id) => document.getElementById(id);
 
+  async function migrateOverridesOnce() {
+    const o = await chrome.storage.local.get(MIGRATE_OVERRIDE_KEY);
+    if (o[MIGRATE_OVERRIDE_KEY]) return false;
+    await chrome.storage.local.set({
+      [W.LS_KEYS.langOverrideByOrigin]: {},
+      [MIGRATE_OVERRIDE_KEY]: true
+    });
+    overrideMap = {};
+    return true;
+  }
+
   async function loadOverrides() {
+    await migrateOverridesOnce();
     const o = await chrome.storage.local.get(W.LS_KEYS.langOverrideByOrigin);
     overrideMap = o[W.LS_KEYS.langOverrideByOrigin] || {};
     if (typeof overrideMap !== "object" || Array.isArray(overrideMap)) overrideMap = {};
+    // 去掉无效/脏值：只保留真实 region id；"auto"/空 一律删除
+    let dirty = false;
+    for (const k of Object.keys(overrideMap)) {
+      const v = overrideMap[k];
+      if (!v || v === "auto" || !(W.regionById(v) || W.countryById(v))) {
+        delete overrideMap[k];
+        dirty = true;
+      }
+    }
+    if (dirty) {
+      await chrome.storage.local.set({ [W.LS_KEYS.langOverrideByOrigin]: overrideMap });
+    }
   }
 
+  /** 仅主动选具体地区时写入；选「跟随网页语言」必须清除该站覆盖 */
   async function saveOverride(origin, value) {
     if (!origin) return;
-    if (!value || value === "auto") delete overrideMap[origin];
-    else overrideMap[origin] = value;
+    if (!value || value === "auto") {
+      if (overrideMap[origin] != null) {
+        delete overrideMap[origin];
+        await chrome.storage.local.set({ [W.LS_KEYS.langOverrideByOrigin]: overrideMap });
+      }
+      return;
+    }
+    const c = W.regionById(value) || W.countryById(value);
+    if (!c) return;
+    if (overrideMap[origin] === c.id) return;
+    overrideMap[origin] = c.id;
     await chrome.storage.local.set({ [W.LS_KEYS.langOverrideByOrigin]: overrideMap });
   }
 
@@ -31,6 +68,7 @@
     const sel = $("regionSelect");
     const prev = sel.value || "auto";
     const q = String(filterText || "").trim().toLowerCase();
+    suppressSelectSave = true;
     sel.innerHTML = "";
     const optAuto = document.createElement("option");
     optAuto.value = "auto";
@@ -48,17 +86,21 @@
       opt.textContent = label;
       sel.appendChild(opt);
     }
-    // 恢复选中；若被过滤掉则仍保留 auto
     if ([].some.call(sel.options, (o) => o.value === prev)) sel.value = prev;
     else sel.value = "auto";
+    suppressSelectSave = false;
   }
 
-  /** 永不返回空卡：未知语种 → UTC */
+  /**
+   * 跟随网页：严格按检出语言映射（pt→圣保罗等），不被旧覆盖卡住。
+   * 仅当该 origin 仍存有效手动地区 id 时才用手动。
+   */
   function resolveCountry() {
     const ov = tabOrigin ? overrideMap[tabOrigin] : null;
     if (ov && ov !== "auto") {
       const c = W.regionById(ov) || W.countryById(ov);
       if (c) return { country: c, mode: "manual", mappedId: c.id, guessed: false };
+      // 脏覆盖：忽略并走自动
     }
     const mappedId = W.regionIdFromLang(detectedLang);
     const c = W.regionById(mappedId) || W.regionById("utc");
@@ -76,22 +118,29 @@
   function syncRegionSelect() {
     const sel = $("regionSelect");
     const ov = tabOrigin ? overrideMap[tabOrigin] : null;
-    const want = ov && ov !== "auto" ? ov : "auto";
+    const want = ov && ov !== "auto" && (W.regionById(ov) || W.countryById(ov)) ? ov : "auto";
+    suppressSelectSave = true;
     if ([].some.call(sel.options, (o) => o.value === want)) sel.value = want;
     else sel.value = "auto";
+    suppressSelectSave = false;
   }
 
   function renderRegionHint(res) {
     const hint = $("regionHint");
     const langZh = W.langDisplayName(detectedLang);
     if (res.mode === "manual") {
-      hint.textContent = `本站手动：${res.country.city}（${res.country.cur}）；检测 ${langZh}`;
+      hint.textContent =
+        `已手动固定：${res.country.city}（${res.country.cur}）。` +
+        `网页语言为${langZh}；请改回「跟随网页语言」才会随语言自动切换地区。`;
     } else if (res.weakUtc) {
-      hint.textContent = `语言 ${langZh} 暂无精确地区，已用 ${res.country.city}（${res.country.cur}），可手动选择`;
+      hint.textContent =
+        `跟随网页中：语言 ${langZh} 暂无精确地区，暂用 ${res.country.city}（${res.country.cur}），可手动选择`;
     } else if (!detectedLang) {
-      hint.textContent = `未能检测语言，已显示 ${res.country.city}；可手动选择地区`;
+      hint.textContent =
+        `跟随网页中：未能检测语言，已显示 ${res.country.city}；可手动选择地区`;
     } else {
-      hint.textContent = `跟随网页：${langZh} → ${res.country.city}（${res.country.cur}）`;
+      hint.textContent =
+        `跟随网页中：${langZh} → ${res.country.city}（${res.country.cur}）`;
     }
   }
 
@@ -99,10 +148,8 @@
     activeCountry = res.country;
     const card = $("mainCard");
     const mount = $("clkMount");
-    // 主卡始终显示
     card.hidden = false;
     if (!res.country) {
-      // 理论上不应发生；兜底 UTC
       activeCountry = W.regionById("utc");
       res = { country: activeCountry, mode: "auto", mappedId: "utc", weakUtc: true };
     }
@@ -352,8 +399,10 @@
     $("fxRefresh").onclick = () => doRefresh();
 
     $("regionSelect").addEventListener("change", async () => {
+      if (suppressSelectSave) return;
       const v = $("regionSelect").value;
-      await saveOverride(tabOrigin, v);
+      // 仅用户主动选择时写入；「跟随网页语言」清除本站覆盖
+      await saveOverride(tabOrigin, v === "auto" ? "auto" : v);
       applyResolved();
     });
 
