@@ -62,16 +62,6 @@
   langInfo = detectLanguage();
 
   /* ================= 浮窗 ================= */
-  function langOk(code) {
-    if (!code) return false;
-    const n = W.normalizeLangCode(code);
-    return !!n.primary && n.primary !== "und";
-  }
-  function strongSrc(s) {
-    s = String(s || "");
-    return !!s && !s.startsWith("heuristic") && s !== "unknown" && s !== "github-default";
-  }
-
   let chromeLang = "";
   let fx = null;
   let usdCny = W.DEFAULT_USD_CNY;
@@ -81,16 +71,12 @@
   let pos = null;
   let country = null;
   let host = null, root = null, panel = null, timer = null;
+  let pickedLang = "";
 
   function pickLang() {
-    const c = langInfo.code, s = langInfo.source;
-    if (langOk(c) && strongSrc(s)) {
-      if (langOk(chromeLang) && String(chromeLang).length > String(c).length) return chromeLang;
-      return c;
-    }
-    if (langOk(chromeLang)) return chromeLang;
-    if (langOk(c)) return c;
-    return "";
+    const picked = W.pickBestLang(chromeLang, langInfo.code, langInfo.source, location.href);
+    pickedLang = picked.code || "";
+    return pickedLang;
   }
 
   function resolveCountry() {
@@ -100,6 +86,24 @@
       if (c) return c;
     }
     return W.regionById(W.regionIdFromLang(pickLang())) || W.regionById("utc");
+  }
+
+  async function refreshChromeLang() {
+    try {
+      const r = await chrome.runtime.sendMessage({ type: "wcfx-detect-lang" });
+      if (r && r.code) chromeLang = r.code;
+    } catch (e) {}
+  }
+
+  function syncRegionFromPage() {
+    langInfo = detectLanguage();
+    const next = resolveCountry();
+    if (!country || !next || country.id !== next.id) renderCountry();
+    else if (host) {
+      host.setAttribute("data-wcfx-region", country.id);
+      host.setAttribute("data-wcfx-lang", pickedLang || "");
+      host.setAttribute("data-wcfx-city", country.city);
+    }
   }
 
   const CSS = `
@@ -163,7 +167,7 @@
 
   function build() {
     host = document.createElement("wcfx-float");
-    root = host.attachShadow({ mode: "closed" });
+    root = host.attachShadow({ mode: "open" });
     root.innerHTML = `<style>${CSS}</style>
       <div class="wrap ph-day" part="wrap">
         <div class="bar"><span class="pin" title="已钉住：所有网页自动常驻显示">📌</span><span class="ttl"></span><span class="mt"></span>
@@ -240,11 +244,18 @@
   }
 
   function renderCountry() {
+    if (!panel) return;
     country = resolveCountry();
     panel.dataset.z = country.tz;
     root.querySelector(".clk").innerHTML = W.renderCardHtml(country);
     root.querySelector(".ttl").textContent = `${country.city} · ${country.cur}`;
     root.querySelector(".code").textContent = country.cur;
+    if (host) {
+      host.setAttribute("data-wcfx-region", country.id);
+      host.setAttribute("data-wcfx-lang", pickedLang || "");
+      host.setAttribute("data-wcfx-city", country.city);
+      host.setAttribute("data-wcfx-cur", country.cur);
+    }
     panel.classList.remove("ph-day", "ph-dawn", "ph-dusk", "ph-night");
     tick(); calc();
   }
@@ -254,11 +265,9 @@
     if (!panel || !country) return;
     if (!alive() || window.__WCFX_ALIVE__ !== alive) { clearInterval(timer); host.remove(); return; }
     if (location.href !== lastUrl) {
-      // SPA 页面内跳转：重新检测语言（位置/收起状态不变）
       lastUrl = location.href;
-      langInfo = detectLanguage();
-      const prev = country && country.id;
-      if (resolveCountry().id !== prev) { renderCountry(); return; }
+      syncRegionFromPage();
+      return;
     }
     if (enabled && !host.isConnected) document.documentElement.appendChild(host);
     const now = new Date();
@@ -314,9 +323,19 @@
     calc();
   });
   document.addEventListener("visibilitychange", () => {
-    if (!document.hidden && enabled) tick();
+    if (!document.hidden && enabled) {
+      refreshChromeLang().then(() => syncRegionFromPage());
+      tick();
+    }
     updateTimer();
   });
+
+  // 页面晚设置 html[lang] 时跟随
+  try {
+    new MutationObserver(() => syncRegionFromPage()).observe(document.documentElement, {
+      attributes: true, attributeFilter: ["lang"]
+    });
+  } catch (e) {}
 
   async function init() {
     const o = await chrome.storage.local.get([FK.enabled, FK.pos, FK.min, K.fx, K.usdCny, K.langOverrideByOrigin]);
@@ -326,12 +345,13 @@
     fx = o[K.fx] || null;
     usdCny = W.normalizeUsdCny(o[K.usdCny] == null ? W.DEFAULT_USD_CNY : o[K.usdCny]);
     overrideMap = o[K.langOverrideByOrigin] || {};
-    try {
-      const r = await chrome.runtime.sendMessage({ type: "wcfx-detect-lang" });
-      if (r && r.code) chromeLang = r.code;
-    } catch (e) {}
+    langInfo = detectLanguage();
+    await refreshChromeLang();
     langInfo = detectLanguage();
     applyState();
+    // detectLanguage 有时在首屏后才稳定，短暂重试
+    setTimeout(async () => { await refreshChromeLang(); syncRegionFromPage(); }, 800);
+    setTimeout(async () => { await refreshChromeLang(); syncRegionFromPage(); }, 2500);
     try {
       const r = await chrome.runtime.sendMessage({ type: "wcfx-get-fx" });
       if (r && r.fx) { fx = r.fx; calc(); }

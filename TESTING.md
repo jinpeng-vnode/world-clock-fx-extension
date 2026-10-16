@@ -40,3 +40,16 @@
 - 路径：W:\github仓库同步目录\world-clock-fx-extension\
 - 变更：v1.3.0 全球语种映射 + 语言中文名 + 中文必出北京 + 主卡永不空白
 - 结论：脚本层用例通过；请用户重新加载后人工点验
+
+## v1.4.2 本机验收（2026-10-16）
+
+有头 Edge + CDP（`--load-extension` 解包）：
+
+| URL | html lang | 浮窗 region/city/cur |
+|-----|-----------|----------------------|
+| http://127.0.0.1:8765/br.html | pt-BR | br / 圣保罗 / BRL |
+| http://127.0.0.1:8765/pt.html | pt | br / 圣保罗 / BRL |
+| http://127.0.0.1:8765/cn.html | zh-CN | cn / 北京 / CNY |
+
+另测：origin 手动覆盖为 cn 时 br 页浮窗变北京；清除覆盖后回到圣保罗。
+根因：旧 `pickLang` 用字符串长度让 `tabs.detectLanguage` 的 `zh-CN` 压过页面 `pt`；现 `pickBestLang` 强页面信号优先，弹窗/浮窗共用。

@@ -237,44 +237,6 @@
     renderFxNote();
   }
 
-  function isStrongContentSource(source) {
-    if (!source) return false;
-    const s = String(source);
-    if (s.startsWith("heuristic")) return false;
-    if (s === "unknown" || s === "github-default") return false;
-    return true;
-  }
-
-  function langOk(code) {
-    if (!code) return false;
-    const n = W.normalizeLangCode(code);
-    return !!n.primary && n.primary !== "und";
-  }
-
-  function pickBestLang(chromeLang, contentLang, contentSource, url) {
-    const chromeOk = langOk(chromeLang);
-    const contentOk = langOk(contentLang);
-    const strong = contentOk && isStrongContentSource(contentSource);
-
-    if (strong && chromeOk) {
-      const a = String(contentLang);
-      const b = String(chromeLang);
-      return a.length >= b.length
-        ? { code: contentLang, source: contentSource }
-        : { code: chromeLang, source: "tabs.detectLanguage" };
-    }
-    if (strong) return { code: contentLang, source: contentSource };
-    if (chromeOk) return { code: chromeLang, source: "tabs.detectLanguage" };
-    if (contentOk) return { code: contentLang, source: contentSource || "content" };
-
-    try {
-      const host = new URL(url).hostname || "";
-      if (host.includes("github.com")) {
-        return { code: "en", source: "github-default" };
-      }
-    } catch (e) {}
-    return { code: "", source: "" };
-  }
 
   async function loadTabLangAndOrigin() {
     const box = $("langBox");
@@ -330,7 +292,7 @@
         contentErr = "content script 未注入（如 chrome://、Web Store）";
       }
 
-      const picked = pickBestLang(chromeLang, contentLang, contentSource, tabUrl);
+      const picked = W.pickBestLang(chromeLang, contentLang, contentSource, tabUrl);
       detectedLang = picked.code || "";
       langSource = picked.source || "";
 

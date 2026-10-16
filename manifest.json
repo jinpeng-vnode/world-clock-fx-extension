@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "世界时钟与汇率",
-  "version": "1.4.1",
+  "version": "1.4.2",
   "description": "网页可拖拽浮窗：按网页语言显示对应地区世界时钟；金额市价转美元，再按可设置的 USD→CNY 倍率显示人民币",
   "permissions": [
     "storage",
