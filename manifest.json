@@ -1,12 +1,13 @@
 {
   "manifest_version": 3,
   "name": "世界时钟与汇率",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "按网页语言显示对应地区世界时钟；金额市价转美元，再按可设置的 USD→CNY 倍率显示人民币",
   "permissions": [
     "storage",
     "alarms",
-    "activeTab"
+    "activeTab",
+    "tabs"
   ],
   "host_permissions": [
     "https://open.er-api.com/*",
@@ -33,12 +34,7 @@
       ],
       "js": [
         "lib/countries.js",
-        "lib/format.js",
-        "lib/fx.js",
         "content/content.js"
-      ],
-      "css": [
-        "content/content.css"
       ],
       "run_at": "document_idle"
     }
