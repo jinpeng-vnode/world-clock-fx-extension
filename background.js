@@ -13,15 +13,19 @@ async function ensureAlarm() {
 chrome.runtime.onInstalled.addListener(async () => {
   await ensureAlarm();
   await WCFX.maybeAutoRefresh();
-  const k = WCFX.LS_KEYS.enabled;
-  const o = await chrome.storage.local.get([k, WCFX.LS_KEYS.pageFx]);
-  if (o[k] == null) {
-    await chrome.storage.local.set({
-      [k]: WCFX.COUNTRIES.map((c) => c.id)
-    });
-  }
+  const o = await chrome.storage.local.get([
+    WCFX.LS_KEYS.pageFx,
+    WCFX.LS_KEYS.usdCny,
+    WCFX.LS_KEYS.langOverrideByOrigin
+  ]);
   if (o[WCFX.LS_KEYS.pageFx] == null) {
     await chrome.storage.local.set({ [WCFX.LS_KEYS.pageFx]: true });
+  }
+  if (o[WCFX.LS_KEYS.usdCny] == null) {
+    await chrome.storage.local.set({ [WCFX.LS_KEYS.usdCny]: WCFX.DEFAULT_USD_CNY });
+  }
+  if (o[WCFX.LS_KEYS.langOverrideByOrigin] == null) {
+    await chrome.storage.local.set({ [WCFX.LS_KEYS.langOverrideByOrigin]: {} });
   }
 });
 

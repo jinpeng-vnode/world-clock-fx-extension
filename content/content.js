@@ -7,6 +7,7 @@
 
   let fxState = { fx: null, offline: false };
   let pageFxOn = true;
+  let usdCny = (W && W.DEFAULT_USD_CNY) || 7;
   let badgeEl = null;
   let langInfo = { code: "", source: "" };
   let scanning = false;
@@ -138,26 +139,21 @@
           parts.push(document.createTextNode(tok));
           const { cur, amount } = parseMoneyToken(tok);
           if (cur && isFinite(amount) && cur !== "CNY") {
-            let cny;
-            let usd;
-            if (cur === "USD") {
-              usd = amount;
-              cny = amount * W.FIXED_USD_CNY;
-            } else {
-              usd = W.toUsd(fxState.fx, amount, cur);
-              cny = W.pageAmountToFixedCny(fxState.fx, amount, cur);
-            }
-            if (isFinite(cny)) {
+            const usd = W.toUsd(fxState.fx, amount, cur);
+            const cny = W.pageAmountToCny(fxState.fx, amount, cur, usdCny);
+            if (isFinite(usd) && isFinite(cny)) {
               const note = document.createElement("span");
               note.className = "wcfx-amt-note";
-              note.textContent = "≈¥" + W.fmtNum(cny, 2);
+              note.textContent = "→ " + W.fmtNum(usd, 2) + " USD → ≈¥" + W.fmtNum(cny, 2);
               note.title =
                 tok +
                 " → " +
-                (isFinite(usd) ? W.fmtNum(usd, 4) + " USD" : "?") +
-                " → ×7 = " +
+                W.fmtNum(usd, 4) +
+                " USD（市价）→ ×" +
+                W.fmtNum(usdCny, 4) +
+                " = " +
                 W.fmtNum(cny, 2) +
-                " CNY（固定）";
+                " CNY";
               parts.push(note);
             }
           }
@@ -179,9 +175,11 @@
 
   async function loadSettingsAndFx() {
     try {
-      const o = await chrome.storage.local.get([W.LS_KEYS.pageFx, W.LS_KEYS.fx]);
+      const keys = [W.LS_KEYS.pageFx, W.LS_KEYS.fx, W.LS_KEYS.usdCny];
+      const o = await chrome.storage.local.get(keys);
       pageFxOn = o[W.LS_KEYS.pageFx] !== false;
       if (o[W.LS_KEYS.fx]) fxState = { fx: o[W.LS_KEYS.fx], offline: false };
+      if (o[W.LS_KEYS.usdCny] != null) usdCny = W.normalizeUsdCny(o[W.LS_KEYS.usdCny]);
     } catch (e) {}
     try {
       const r = await chrome.runtime.sendMessage({ type: "wcfx-get-fx" });
@@ -198,6 +196,10 @@
     }
     if (changes[W.LS_KEYS.fx]) {
       fxState.fx = changes[W.LS_KEYS.fx].newValue;
+      if (pageFxOn) annotateVisibleAmounts();
+    }
+    if (changes[W.LS_KEYS.usdCny]) {
+      usdCny = W.normalizeUsdCny(changes[W.LS_KEYS.usdCny].newValue);
       if (pageFxOn) annotateVisibleAmounts();
     }
   });
