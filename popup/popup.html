@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>世界时钟与汇率</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <header class="top">
+    <div class="title">世界时钟与汇率</div>
+    <div id="langBox" class="lang-box" title="当前标签页语言">语言 —</div>
+  </header>
+
+  <section class="toolbar">
+    <label class="sw"><input type="checkbox" id="pageFxToggle" checked /> 页面金额旁注</label>
+    <button type="button" id="fxRefresh" class="btn">⟳ 刷新汇率</button>
+  </section>
+  <p id="fxNote" class="fx-note">正在获取汇率…</p>
+
+  <section class="toggles" id="countryToggles" aria-label="显示国家"></section>
+
+  <div id="clkGrid" class="cty-grid"></div>
+
+  <footer class="foot">
+    页面金额：标准汇率→USD，再按 1 USD = 7 CNY 显示。时钟卡换算用市场汇率。
+  </footer>
+
+  <script src="../lib/countries.js"></script>
+  <script src="../lib/format.js"></script>
+  <script src="../lib/fx.js"></script>
+  <script src="../lib/clock.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>
