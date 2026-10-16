@@ -57,6 +57,15 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     WCFX.maybeAutoRefresh().then((r) => sendResponse(r));
     return true;
   }
+  if (msg.type === "wcfx-detect-lang") {
+    const tabId = _sender && _sender.tab && _sender.tab.id;
+    if (tabId == null || !chrome.tabs.detectLanguage) { sendResponse({ code: "" }); return; }
+    chrome.tabs.detectLanguage(tabId).then(
+      (code) => sendResponse({ code: code || "" }),
+      () => sendResponse({ code: "" })
+    );
+    return true;
+  }
   if (msg.type === "wcfx-migrate-overrides") {
     migrateOverridesOnce().then(() => sendResponse({ ok: true }));
     return true;

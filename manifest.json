@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "世界时钟与汇率",
-  "version": "1.3.1",
-  "description": "按网页语言显示对应地区世界时钟；金额市价转美元，再按可设置的 USD→CNY 倍率显示人民币",
+  "version": "1.4.0",
+  "description": "网页可拖拽浮窗：按网页语言显示对应地区世界时钟；金额市价转美元，再按可设置的 USD→CNY 倍率显示人民币",
   "permissions": [
     "storage",
     "alarms",
@@ -34,6 +34,9 @@
       ],
       "js": [
         "lib/countries.js",
+        "lib/format.js",
+        "lib/fx.js",
+        "lib/clock.js",
         "content/content.js"
       ],
       "run_at": "document_idle"

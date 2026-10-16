@@ -398,6 +398,13 @@
 
     $("fxRefresh").onclick = () => doRefresh();
 
+    const FLOAT_KEY = "wcfx_float_enabled";
+    const fo = await chrome.storage.local.get(FLOAT_KEY);
+    $("floatToggle").checked = fo[FLOAT_KEY] !== false;
+    $("floatToggle").addEventListener("change", () => {
+      chrome.storage.local.set({ [FLOAT_KEY]: $("floatToggle").checked });
+    });
+
     $("regionSelect").addEventListener("change", async () => {
       if (suppressSelectSave) return;
       const v = $("regionSelect").value;

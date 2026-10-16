@@ -163,3 +163,4 @@ body {
   padding: 0 12px 10px; font-size: 10px; color: #6b7385; line-height: 1.35;
 }
 
+.float-toggle { font-size: 12px; font-weight: 650; display: flex; align-items: center; gap: 4px; cursor: pointer; }
