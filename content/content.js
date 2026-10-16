@@ -1,7 +1,10 @@
 (function () {
-  if (window.__WCFX_CONTENT__) return;
-  window.__WCFX_CONTENT__ = true;
   if (window.top !== window) return;
+  // 已有存活实例则跳过；扩展重载后旧实例失效(orphan)，允许新实例接管
+  try { if (window.__WCFX_ALIVE__ && window.__WCFX_ALIVE__()) return; } catch (e) {}
+  const alive = () => { try { return !!chrome.runtime.id; } catch (e) { return false; } };
+  window.__WCFX_ALIVE__ = alive;
+  document.querySelectorAll("wcfx-float").forEach((n) => n.remove());
 
   const W = globalThis.WCFX;
   const K = W.LS_KEYS;
@@ -114,6 +117,7 @@
 .bar { display: flex; align-items: center; gap: 4px; padding: 4px 6px 3px 9px; cursor: move;
   background: rgba(0,0,0,.05); touch-action: none; }
 .wrap.ph-night .bar { background: rgba(255,255,255,.07); }
+.bar .pin { font-size: 11px; }
 .bar .ttl { flex: 1; text-align: left; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .bar .mt { font-variant-numeric: tabular-nums; font-weight: 650; display: none; }
 .wrap.min .bar .mt { display: inline; }
@@ -162,8 +166,8 @@
     root = host.attachShadow({ mode: "closed" });
     root.innerHTML = `<style>${CSS}</style>
       <div class="wrap ph-day" part="wrap">
-        <div class="bar"><span class="ttl"></span><span class="mt"></span>
-          <button class="bmin" title="收起/展开">–</button><button class="bclose" title="关闭浮窗（可在扩展弹窗中重新打开）">×</button></div>
+        <div class="bar"><span class="pin" title="已钉住：所有网页自动常驻显示">📌</span><span class="ttl"></span><span class="mt"></span>
+          <button class="bmin" title="收起/展开">–</button><button class="bclose" title="关闭常驻浮窗（所有网页隐藏；在扩展弹窗勾选「在所有网页常驻显示浮窗」重新打开）">×</button></div>
         <div class="body">
           <div class="clk"></div>
           <div class="conv">
@@ -186,7 +190,11 @@
       chrome.storage.local.set({ [FK.enabled]: false });
     });
     setupDrag(root.querySelector(".bar"));
-    (document.body || document.documentElement).appendChild(host);
+    document.documentElement.appendChild(host);
+    // 页面/SPA 重写 DOM 时把浮窗挂回去
+    new MutationObserver(() => {
+      if (alive() && window.__WCFX_ALIVE__ === alive && enabled && host && !host.isConnected) document.documentElement.appendChild(host);
+    }).observe(document.documentElement, { childList: true });
     window.addEventListener("resize", () => applyPos(false));
   }
 
@@ -241,8 +249,18 @@
     tick(); calc();
   }
 
+  let lastUrl = location.href;
   function tick() {
     if (!panel || !country) return;
+    if (!alive() || window.__WCFX_ALIVE__ !== alive) { clearInterval(timer); host.remove(); return; }
+    if (location.href !== lastUrl) {
+      // SPA 页面内跳转：重新检测语言（位置/收起状态不变）
+      lastUrl = location.href;
+      langInfo = detectLanguage();
+      const prev = country && country.id;
+      if (resolveCountry().id !== prev) { renderCountry(); return; }
+    }
+    if (enabled && !host.isConnected) document.documentElement.appendChild(host);
     const now = new Date();
     W.tickCard(panel, now, W.zoneOffsetMin(W.BJ_TZ, now));
     const tm = root.querySelector(".clk .tm");
@@ -273,7 +291,7 @@
       return;
     }
     if (!host) { build(); renderCountry(); }
-    if (!host.isConnected) (document.body || document.documentElement).appendChild(host);
+    if (!host.isConnected) document.documentElement.appendChild(host);
     host.style.display = "";
     panel.classList.toggle("min", minimized);
     applyPos();

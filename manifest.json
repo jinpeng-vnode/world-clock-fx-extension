@@ -1,18 +1,21 @@
 {
   "manifest_version": 3,
   "name": "世界时钟与汇率",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "description": "网页可拖拽浮窗：按网页语言显示对应地区世界时钟；金额市价转美元，再按可设置的 USD→CNY 倍率显示人民币",
   "permissions": [
     "storage",
     "alarms",
     "activeTab",
-    "tabs"
+    "tabs",
+    "scripting"
   ],
   "host_permissions": [
     "https://open.er-api.com/*",
     "https://cdn.jsdelivr.net/*",
-    "https://latest.currency-api.pages.dev/*"
+    "https://latest.currency-api.pages.dev/*",
+    "http://*/*",
+    "https://*/*"
   ],
   "background": {
     "service_worker": "background.js"
@@ -22,6 +25,7 @@
     "default_title": "世界时钟与汇率",
     "default_icon": {
       "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
       "48": "icons/icon48.png",
       "128": "icons/icon128.png"
     }
@@ -39,11 +43,13 @@
         "lib/clock.js",
         "content/content.js"
       ],
-      "run_at": "document_idle"
+      "run_at": "document_end",
+      "all_frames": false
     }
   ],
   "icons": {
     "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
   }

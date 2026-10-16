@@ -21,7 +21,20 @@ async function migrateOverridesOnce() {
   });
 }
 
+/** 安装/更新后给已打开的网页补注入浮窗，无需逐页刷新或点击 */
+async function injectIntoOpenTabs() {
+  try {
+    const cs = chrome.runtime.getManifest().content_scripts[0];
+    const tabs = await chrome.tabs.query({ url: ["http://*/*", "https://*/*"] });
+    for (const t of tabs) {
+      if (t.id == null || t.discarded) continue;
+      chrome.scripting.executeScript({ target: { tabId: t.id }, files: cs.js }).catch(() => {});
+    }
+  } catch (e) {}
+}
+
 chrome.runtime.onInstalled.addListener(async () => {
+  injectIntoOpenTabs();
   await ensureAlarm();
   await migrateOverridesOnce();
   await WCFX.maybeAutoRefresh();
