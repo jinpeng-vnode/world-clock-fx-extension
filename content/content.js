@@ -167,9 +167,12 @@
 
   function build() {
     host = document.createElement("wcfx-float");
+    // 防谷歌翻译改写浮窗内容：宿主与 Shadow 根容器都标记不翻译，动态插入的子元素随之继承
+    host.setAttribute("translate", "no");
+    host.classList.add("notranslate");
     root = host.attachShadow({ mode: "open" });
     root.innerHTML = `<style>${CSS}</style>
-      <div class="wrap ph-day" part="wrap">
+      <div class="wrap ph-day notranslate" part="wrap" translate="no">
         <div class="bar"><span class="pin" title="已钉住：所有网页自动常驻显示">📌</span><span class="ttl"></span><span class="mt"></span>
           <button class="bmin" title="收起/展开">–</button><button class="bclose" title="关闭常驻浮窗（所有网页隐藏；在扩展弹窗勾选「在所有网页常驻显示浮窗」重新打开）">×</button></div>
         <div class="body">
