@@ -1,12 +1,7 @@
 // world-clock-fx-extension 流水线：只盯 dev，两步——单元测试、打包；zip 存成构建产物。
-// 不部署，不用任何凭据。统一在 node:24 容器里跑，节点上不用装 node（要有 docker 和 Docker Pipeline 插件）。
+// 不部署，不用任何凭据。直接用节点上的 node（要求 node 24 以上），不用 docker。
 pipeline {
-    agent {
-        docker {
-            image 'node:24'
-            reuseNode true
-        }
-    }
+    agent any
     options {
         timeout(time: 15, unit: 'MINUTES')
         disableConcurrentBuilds()
@@ -20,7 +15,8 @@ pipeline {
         stage('单元测试') {
             when { anyOf { branch 'dev'; expression { env.GIT_BRANCH ==~ /(origin\/)?dev/ } } }
             steps {
-                sh 'node --version'
+                sh 'node -v'
+                sh 'npm -v'
                 sh 'npm test'
             }
         }
